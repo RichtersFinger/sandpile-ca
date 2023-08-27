@@ -1,0 +1,124 @@
+"""Pile of granular material as a collection of grains in a grid-space."""
+import numpy as np
+import random
+
+class TopplingRuleSets():
+    @classmethod
+    def BASIC_TOPPLING_RULE(self, diff_topple=3):
+        """Returns function to be used as toppling rule."""
+        def rule(data, ix, iy, ix2, iy2):
+            """Compares neighbors and returns toppling event or None."""
+            # neighbors = [(-1, 0), (0, -1), (1, 0), (0, 1)]
+            if data[ix, iy] + diff_topple < data[ix2, iy2]:
+                return TopplingEvent(ix, iy, ix2, iy2,
+                    (data[ix, iy] - data[ix2, iy2])//2)
+            if data[ix, iy] - diff_topple > data[ix2, iy2]:
+                return TopplingEvent(ix2, iy2, ix, iy,
+                    (data[ix2, iy2] - data[ix, iy])//2)
+            return None
+        return rule
+
+class TopplingEvent():
+    def __init__(self, fromx, fromy, tox, toy, amount):
+        self.fromx = fromx
+        self.fromy = fromy
+        self.tox = tox
+        self.toy = toy
+        self.amount = amount
+
+    def __str__(self):
+        return f"{self.amount} "\
+            f"from ({self.fromx}, {self.fromy}) "\
+            f"to ({self.tox}, {self.toy})"
+
+    def execute(self, data):
+        """Applies the stored event information to data."""
+        data[self.fromx, self.fromy] -= self.amount
+        data[self.tox, self.toy] += self.amount
+        return None
+
+class Pile():
+    """
+    Pile of granular material as a collection of grains in a grid-space.
+
+    Keyword arguments:
+    nx -- lateral pile resolution in x-direction
+          (default 100)
+    ny -- lateral pile resolution in y-direction
+          (default 100)
+    toppling_rule -- function taking arguments data, ix, iy, ix2, iy2
+                     to return a TopplingEvent or None if no toppling
+    bc -- function to map the boundary condition-appropriate value to
+          given index
+          (default _periodic_boundary)
+    """
+    def __init__(self,
+        nx=100, ny=100,
+        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(),
+        #boundary_condition=_periodic_boundary
+    ):
+        self.nx = nx
+        self.ny = ny
+        self.height = np.zeros((self.nx, self.ny))
+        self._toppling_rule = toppling_rule
+        self._bc = self._periodic_boundary
+
+        # setup iteration 2d indices in random sequence
+        self._indixpairs = []
+        for ix in range(self.nx):
+            for iy in range(self.ny):
+                self._indixpairs.append([(ix, iy), self._bc(ix + 1, iy)])
+                self._indixpairs.append([(ix, iy), self._bc(ix, iy + 1)])
+
+    def _periodic_boundary(self, ix, iy):
+        """Apply periodic boundary to indices."""
+        resx = ix % self.nx
+        if ix < 0:
+            resx += + self.nx
+        resy = iy % self.ny
+        if iy < 0:
+            resy += + self.ny
+        return resx, resy
+
+    def randomize(self):
+        self.height = np.random.randint(0, 15, (self.nx, self.ny))
+
+    def pour(self, nsteps=1, stencil=lambda x, y: 1):
+        """
+        Add/Remove material to/from the pile. The stencil function can be
+        used to precisely control the conditions
+
+        Keyword arguments:
+        nsteps -- number of iterations
+                  (default 1)
+        stencil -- function expecting 2d-indices [0,1]x[0,1] which returns the
+                   average material for deposition/erosion.
+                   (default lambda x, y: 1)
+        """
+
+        for ix in range(self.nx):
+            for iy in range(self.ny):
+                x, y = ix/self.nx, iy/self.ny
+                self.height[ix, iy] += \
+                    int(random.random() * nsteps + 0.5)*stencil(x, y)
+
+    def iterate(self, nsteps=1):
+        """
+        Apply toppling rules.
+
+        Keyword arguments:
+        nsteps -- number of iterations
+                  (default 1)
+        """
+
+        for _ in range(nsteps):
+            # permute execution order
+            random.shuffle(self._indixpairs)
+
+            # look for toppling events
+            for indexpair in self._indixpairs:
+                event = self._toppling_rule(
+                    self.height, *indexpair[0], *indexpair[1]
+                )
+                if event is not None:
+                    event.execute(self.height)
