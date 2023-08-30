@@ -1,4 +1,6 @@
+import numpy as np
 import math
+import sys
 from src.plot import Plotter
 from src.pile import Pile
 
@@ -16,3 +18,6 @@ for _ in range(100):
     pile.iterate()
 
     plotter.plot2d(pile.height, block=False, interval=0.25)
+
+with open("array.dat", "w") as file:
+	np.savetxt(file, pile.height, fmt="%d")
