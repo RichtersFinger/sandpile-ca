@@ -1,10 +1,11 @@
 """Pile of granular material as a collection of grains in a grid-space."""
-import numpy as np
 import random
+import math
+import numpy as np
 
 class TopplingRuleSets():
     @classmethod
-    def BASIC_TOPPLING_RULE(self, diff_topple=3):
+    def BASIC_TOPPLING_RULE(self, diff_topple=10):
         """Returns function to be used as toppling rule."""
         def rule(data, ix, iy, ix2, iy2):
             """Compares neighbors and returns toppling event or None."""
@@ -31,10 +32,10 @@ class TopplingEvent():
             f"from ({self.fromx}, {self.fromy}) "\
             f"to ({self.tox}, {self.toy})"
 
-    def execute(self, data):
+    def execute(self, data, multiplier=1):
         """Applies the stored event information to data."""
-        data[self.fromx, self.fromy] -= self.amount
-        data[self.tox, self.toy] += self.amount
+        data[self.fromx, self.fromy] -= int(self.amount/multiplier)
+        data[self.tox, self.toy] += int(self.amount/multiplier)
         return None
 
 class Pile():
@@ -64,26 +65,30 @@ class Pile():
         self._bc = self._periodic_boundary
 
         # setup iteration 2d indices in random sequence
-        self._indixpairs = []
+        # third value corresponds to distance between lateral locations and
+        # is mostly relevant for symmetry
+        self._indexpairs = []
         for ix in range(self.nx):
             for iy in range(self.ny):
-                self._indixpairs.append([(ix, iy), self._bc(ix + 1, iy)])
-                self._indixpairs.append([(ix, iy), self._bc(ix, iy + 1)])
+                self._indexpairs.append([(ix, iy), self._bc(ix + 1, iy), 1])
+                self._indexpairs.append([(ix, iy), self._bc(ix, iy + 1), 1])
+                self._indexpairs.append(
+                    [(ix, iy), self._bc(ix + 1, iy + 1), 1/math.sqrt(2)]
+                )
+                self._indexpairs.append(
+                    [(ix, iy), self._bc(ix - 1, iy + 1), 1/math.sqrt(2)]
+                )
 
     def _periodic_boundary(self, ix, iy):
         """Apply periodic boundary to indices."""
         resx = ix % self.nx
-        if ix < 0:
-            resx += + self.nx
         resy = iy % self.ny
-        if iy < 0:
-            resy += + self.ny
         return resx, resy
 
     def randomize(self):
         self.height = np.random.randint(0, 15, (self.nx, self.ny))
 
-    def pour(self, nsteps=1, stencil=lambda x, y: 1):
+    def pour(self, nsteps=1, probability = 0.5, stencil=lambda x, y: 1):
         """
         Add/Remove material to/from the pile. The stencil function can be
         used to precisely control the conditions
@@ -91,6 +96,8 @@ class Pile():
         Keyword arguments:
         nsteps -- number of iterations
                   (default 1)
+        probability -- probability of adding one piece to the pile per iteration
+                       (default 0.5)
         stencil -- function expecting 2d-indices [0,1]x[0,1] which returns the
                    average material for deposition/erosion.
                    (default lambda x, y: 1)
@@ -99,8 +106,10 @@ class Pile():
         for ix in range(self.nx):
             for iy in range(self.ny):
                 x, y = ix/self.nx, iy/self.ny
-                self.height[ix, iy] += \
-                    int(random.random() * nsteps + 0.5)*stencil(x, y)
+                for ii in range(nsteps):
+                    if random.random() < probability:
+                        self.height[ix, iy] += \
+                            stencil(x, y)
 
     def iterate(self, nsteps=1):
         """
@@ -113,12 +122,12 @@ class Pile():
 
         for _ in range(nsteps):
             # permute execution order
-            random.shuffle(self._indixpairs)
+            random.shuffle(self._indexpairs)
 
             # look for toppling events
-            for indexpair in self._indixpairs:
+            for indexpair in self._indexpairs:
                 event = self._toppling_rule(
                     self.height, *indexpair[0], *indexpair[1]
                 )
                 if event is not None:
-                    event.execute(self.height)
+                    event.execute(self.height, indexpair[2])

@@ -8,15 +8,15 @@ from pathlib import Path
 PLATE_WIDTH = 1.43587
 CUBE_REFERENCE_WIDTH = 0.2
 CUBE_REFERENCE_HEIGHT = 15.8519
-PILE_VERTICAL_OFFSET = -0.05
-Z_SCALE_FACTOR = 0.8
+PILE_VERTICAL_OFFSET = -0.025
+Z_SCALE_FACTOR = 0.8/3
 
 
-bpy.ops.wm.open_mainfile(filepath="render.blend")
+bpy.ops.wm.open_mainfile(filepath="render_lq.blend")
 scn = bpy.context.scene
 
-# read current data
-data = Path("array.dat").read_text(encoding="utf8")
+# read sample data
+data = Path("../data/array_0.dat").read_text(encoding="utf8")
 height_array = []
 for line in data.split("\n"):
     if line != "":
@@ -40,6 +40,7 @@ for ix, row in enumerate(height_array):
     for iy, column in enumerate(row):
         thisrow.append(math.sqrt((nx/2 - ix)**2/nx**2 + (ny/2 - iy)**2/ny**2) < 0.5)
     visible.append(thisrow)
+print("made selection for range to be plotted")
 
 # generate python objects as copies from reference
 objects = []
@@ -53,26 +54,37 @@ for ix, row in enumerate(height_array):
             thisrow.append(column)
         else:
             thisrow.append(None)
+    print(f"progress on generating elements {ix}/{nx}")
     objects.append(thisrow)
-
-# position columns
-for ix, row in enumerate(objects):
-    for iy, column in enumerate(row):
-        if visible[ix][iy]:
-            column.location = (
-                -desired_width*nx + 2*ix*desired_width,
-                -desired_width*ny + 2*iy*desired_width,
-                -CUBE_REFERENCE_HEIGHT + PILE_VERTICAL_OFFSET \
-                    + Z_SCALE_FACTOR * desired_width * height_array[ix][iy]
-            )
+print("generated blender objects")
 
 #bpy.ops.wm.save_as_mainfile(filepath="render_.blend")
 
-nframes = 0
+nframes = 60
 
-frame0 = 0
+frame0 = 60#0
 frame1 = nframes
 for i in range(frame0, frame1 + 1, 1):
+    # read sample data
+    data = Path(f"../data/array_{i}.dat").read_text(encoding="utf8")
+    height_array = []
+    for line in data.split("\n"):
+        if line != "":
+            row = [int(x) for x in line.split()]
+            height_array.append(row)
+
+    # position columns
+    for ix, row in enumerate(objects):
+        for iy, column in enumerate(row):
+            if visible[ix][iy]:
+                column.location = (
+                    -desired_width*nx + 2*ix*desired_width,
+                    -desired_width*ny + 2*iy*desired_width,
+                    -CUBE_REFERENCE_HEIGHT + PILE_VERTICAL_OFFSET \
+                        + Z_SCALE_FACTOR * desired_width * height_array[ix][iy]
+                )
+
+    # render
     bpy.context.scene.render.filepath = f"res/frame{i}.png"
     bpy.ops.render.render(write_still = True)
     print("frame " + str(1 + i - frame0) + "/" + str(1 + frame1 - frame0) + " done")
