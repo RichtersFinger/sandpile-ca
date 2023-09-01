@@ -12,9 +12,12 @@ pile.randomize()
 
 momentum = np.ones((pile.nx, pile.ny))
 for i in range(2000):
+    print(i)
+
     with open(f"data/array_{i}.dat", "w") as file:
-        np.savetxt(file, momentum, fmt="%d")
-        #np.savetxt(file, pile.height, fmt="%d")
+        #np.savetxt(file, momentum, fmt="%f")
+        np.savetxt(file, pile.height, fmt="%d")
+
     for _ in range(10):
         pile.pour(
             probability=0.3,
@@ -24,11 +27,11 @@ for i in range(2000):
         pre = np.copy(pile.height)
         pile.iterate(3, inhomogeneity=momentum)
         momentum = np.reciprocal(
-            np.minimum(
+            np.maximum(
                 np.abs(np.subtract(pre, pile.height)),
                 np.ones((pile.nx, pile.ny))
             ).astype(np.float32)
         )
 
-        #plotter.plot2d(pile.height, block=False, interval=0.25)
-        plotter.plot2d(momentum, block=False, interval=0.25)
+        plotter.plot2d(pile.height, block=False, interval=0.25)
+        #plotter.plot2d(momentum, block=False, interval=0.25)

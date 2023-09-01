@@ -60,9 +60,9 @@ print("generated blender objects")
 
 #bpy.ops.wm.save_as_mainfile(filepath="render_.blend")
 
-nframes = 60
+nframes = 20
 
-frame0 = 60#0
+frame0 = 20#0
 frame1 = nframes
 for i in range(frame0, frame1 + 1, 1):
     # read sample data
