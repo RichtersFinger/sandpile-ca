@@ -5,15 +5,14 @@ import numpy as np
 
 class TopplingRuleSets():
     @classmethod
-    def BASIC_TOPPLING_RULE(self, diff_topple=10):
+    def BASIC_TOPPLING_RULE(self, diff_topple=1):
         """Returns function to be used as toppling rule."""
-        def rule(data, ix, iy, ix2, iy2):
+        def rule(data, ix, iy, ix2, iy2, inhomogeneity=1):
             """Compares neighbors and returns toppling event or None."""
-            # neighbors = [(-1, 0), (0, -1), (1, 0), (0, 1)]
-            if data[ix, iy] + diff_topple < data[ix2, iy2]:
+            if data[ix, iy] + diff_topple*inhomogeneity < data[ix2, iy2]:
                 return TopplingEvent(ix, iy, ix2, iy2,
                     (data[ix, iy] - data[ix2, iy2])//2)
-            if data[ix, iy] - diff_topple > data[ix2, iy2]:
+            if data[ix, iy] - diff_topple*inhomogeneity > data[ix2, iy2]:
                 return TopplingEvent(ix2, iy2, ix, iy,
                     (data[ix2, iy2] - data[ix, iy])//2)
             return None
@@ -55,7 +54,7 @@ class Pile():
     """
     def __init__(self,
         nx=100, ny=100,
-        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(),
+        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(diff_topple=10),
         #boundary_condition=_periodic_boundary
     ):
         self.nx = nx
@@ -111,7 +110,7 @@ class Pile():
                         self.height[ix, iy] += \
                             stencil(x, y)
 
-    def iterate(self, nsteps=1):
+    def iterate(self, nsteps=1, inhomogeneity=None):
         """
         Apply toppling rules.
 
@@ -120,6 +119,9 @@ class Pile():
                   (default 1)
         """
 
+        if inhomogeneity is None:
+            inhomogeneity = np.ones((self.nx, self.ny))
+
         for _ in range(nsteps):
             # permute execution order
             random.shuffle(self._indexpairs)
@@ -127,7 +129,11 @@ class Pile():
             # look for toppling events
             for indexpair in self._indexpairs:
                 event = self._toppling_rule(
-                    self.height, *indexpair[0], *indexpair[1]
+                    self.height, *indexpair[0], *indexpair[1],
+                    inhomogeneity=min(
+                        inhomogeneity[indexpair[0]],
+                        inhomogeneity[indexpair[1]]
+                    )
                 )
                 if event is not None:
                     event.execute(self.height, indexpair[2])
