@@ -2,15 +2,10 @@
 Module containing the demo-usage of the src/pile.py-module.
 """
 
-# FIXME:
-# * have different toppling rules w and wo inhomogeneity
-# * put video in separate branch
-
 import math
 from pathlib import Path
 import numpy as np
 import scipy
-from src.plot import Plotter
 from src.pile import Pile, TopplingRuleSets
 
 # configuration
@@ -31,6 +26,7 @@ if WRITE_DATA_FILES and not DATA_DIRECTORY.is_dir():
 
 # apply configuration
 if USE_PLOTTER:
+    from src.plot import Plotter
     plotter = Plotter()
 
 if USE_MOMENTUM:

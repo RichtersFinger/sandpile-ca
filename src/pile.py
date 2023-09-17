@@ -1,27 +1,28 @@
-"""Pile of granular material as a collection of grains in a grid-space."""
+"""Pile of granular material as a height profile defined on a discrete 2d-lattice."""
 import random
 import math
 import numpy as np
 
 class TopplingRuleSets():
+    """Container class for a collection of toppling rule generators."""
     @classmethod
-    def BASIC_TOPPLING_RULE(cls, diff_topple=1):
+    def BASIC_TOPPLING_RULE(cls, diff_topple=15):
         """Returns function to be used as toppling rule."""
         def rule(data, ix, iy, ix2, iy2):
             """Compares neighbors and returns toppling event or None."""
             if data[ix, iy] + diff_topple < data[ix2, iy2]:
-                return TopplingEvent(ix, iy, ix2, iy2,
+                return TopplingEvent((ix, iy), (ix2, iy2),
                     (data[ix, iy] - data[ix2, iy2])//2)
             if data[ix, iy] - diff_topple > data[ix2, iy2]:
-                return TopplingEvent(ix2, iy2, ix, iy,
+                return TopplingEvent((ix2, iy2), (ix, iy),
                     (data[ix2, iy2] - data[ix, iy])//2)
             return None
         return rule
 
     @classmethod
-    def INHOMOGENEOUS_TOPPLING_RULE(cls, diff_topple=1):
+    def INHOMOGENEOUS_TOPPLING_RULE(cls, diff_topple=15):
         """Returns function to be used as toppling rule."""
-        def rule(data, ix, iy, ix2, iy2, inhomogeneity=1):
+        def rule(data, ix, iy, ix2, iy2, inhomogeneity):
             """
             Compares neighbors and returns toppling event or None;
             Makes use of inhomogeneity array to modify topple threshold.
@@ -30,24 +31,33 @@ class TopplingRuleSets():
                         inhomogeneity[ix, iy],
                         inhomogeneity[ix2, iy2]
                     ) < data[ix2, iy2]:
-                return TopplingEvent(ix, iy, ix2, iy2,
+                return TopplingEvent((ix, iy), (ix2, iy2),
                     (data[ix, iy] - data[ix2, iy2])//2)
             if data[ix, iy] - diff_topple*min(
                         inhomogeneity[ix, iy],
                         inhomogeneity[ix2, iy2]
                     ) > data[ix2, iy2]:
-                return TopplingEvent(ix2, iy2, ix, iy,
+                return TopplingEvent((ix2, iy2), (ix, iy),
                     (data[ix2, iy2] - data[ix, iy])//2)
             return None
         return rule
 
 class TopplingEvent():
-    def __init__(self, fromx, fromy, tox, toy, amount):
-        self.fromx = fromx
-        self.fromy = fromy
-        self.tox = tox
-        self.toy = toy
-        self.amount = amount
+    """
+    Class that describes a toppling event via transport coordinates and
+    volume.
+
+    Keyword arguments:
+    _from -- 2-tuple origin of mass transport
+    _to -- 2-tuple target of mass transport
+    _amount -- transport volume
+    """
+    def __init__(self, _from, _to, _amount):
+        self.fromx = _from[0]
+        self.fromy = _from[1]
+        self.tox = _to[0]
+        self.toy = _to[1]
+        self.amount = _amount
 
     def __str__(self):
         return f"{self.amount} "\
@@ -55,10 +65,15 @@ class TopplingEvent():
             f"to ({self.tox}, {self.toy})"
 
     def execute(self, data, multiplier=1):
-        """Applies the stored event information to data."""
+        """
+        Applies the stored event information to np array.
+
+        Keyword arguments:
+        data -- 2d np-array containing pile
+        multiplier -- multiplier for transport volume (reciprocal)
+        """
         data[self.fromx, self.fromy] -= int(self.amount/multiplier)
         data[self.tox, self.toy] += int(self.amount/multiplier)
-        return None
 
 class Pile():
     """
@@ -71,14 +86,10 @@ class Pile():
           (default 100)
     toppling_rule -- function taking arguments data, ix, iy, ix2, iy2
                      to return a TopplingEvent or None if no toppling
-    bc -- function to map the boundary condition-appropriate value to
-          given index
-          (default _periodic_boundary)
     """
     def __init__(self,
         nx=100, ny=100,
-        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(diff_topple=10),
-        #boundary_condition=_periodic_boundary
+        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(diff_topple=10)
     ):
         self.nx = nx
         self.ny = ny
@@ -86,9 +97,9 @@ class Pile():
         self._toppling_rule = toppling_rule
         self._bc = self._periodic_boundary
 
-        # setup iteration 2d indices in random sequence
-        # third value corresponds to distance between lateral locations and
-        # is mostly relevant for symmetry
+        # setup iteration of 2d indices in random sequence
+        # third value corresponds to distance in lateral position and
+        # is mostly relevant for symmetry in the simulation result
         self._indexpairs = []
         for ix in range(self.nx):
             for iy in range(self.ny):
@@ -108,9 +119,10 @@ class Pile():
         return resx, resy
 
     def randomize(self):
+        """Randomize height profile."""
         self.height = np.random.randint(0, 15, (self.nx, self.ny))
 
-    def pour(self, nsteps=1, probability = 0.5, stencil=lambda x, y: 1):
+    def pour(self, nsteps=1, probability = 0.5, stencil=lambda x, y: 0):
         """
         Add/Remove material to/from the pile. The stencil function can be
         used to precisely control the conditions
@@ -120,15 +132,15 @@ class Pile():
                   (default 1)
         probability -- probability of adding one piece to the pile per iteration
                        (default 0.5)
-        stencil -- function expecting 2d-indices [0,1]x[0,1] which returns the
-                   average material for deposition/erosion.
-                   (default lambda x, y: 1)
+        stencil -- function expecting 2d-indices [0,nx-1]x[0,ny-1] which returns
+                   the average material for deposition/erosion.
+                   (default lambda x, y: 0)
         """
 
         for ix in range(self.nx):
             for iy in range(self.ny):
                 x, y = ix/self.nx, iy/self.ny
-                for ii in range(nsteps):
+                for _ in range(nsteps):
                     if random.random() < probability:
                         self.height[ix, iy] += \
                             stencil(x, y)
