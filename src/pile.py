@@ -7,12 +7,35 @@ class TopplingRuleSets():
     @classmethod
     def BASIC_TOPPLING_RULE(cls, diff_topple=1):
         """Returns function to be used as toppling rule."""
-        def rule(data, ix, iy, ix2, iy2, inhomogeneity=1):
+        def rule(data, ix, iy, ix2, iy2):
             """Compares neighbors and returns toppling event or None."""
-            if data[ix, iy] + diff_topple*inhomogeneity < data[ix2, iy2]:
+            if data[ix, iy] + diff_topple < data[ix2, iy2]:
                 return TopplingEvent(ix, iy, ix2, iy2,
                     (data[ix, iy] - data[ix2, iy2])//2)
-            if data[ix, iy] - diff_topple*inhomogeneity > data[ix2, iy2]:
+            if data[ix, iy] - diff_topple > data[ix2, iy2]:
+                return TopplingEvent(ix2, iy2, ix, iy,
+                    (data[ix2, iy2] - data[ix, iy])//2)
+            return None
+        return rule
+
+    @classmethod
+    def INHOMOGENEOUS_TOPPLING_RULE(cls, diff_topple=1):
+        """Returns function to be used as toppling rule."""
+        def rule(data, ix, iy, ix2, iy2, inhomogeneity=1):
+            """
+            Compares neighbors and returns toppling event or None;
+            Makes use of inhomogeneity array to modify topple threshold.
+            """
+            if data[ix, iy] + diff_topple*min(
+                        inhomogeneity[ix, iy],
+                        inhomogeneity[ix2, iy2]
+                    ) < data[ix2, iy2]:
+                return TopplingEvent(ix, iy, ix2, iy2,
+                    (data[ix, iy] - data[ix2, iy2])//2)
+            if data[ix, iy] - diff_topple*min(
+                        inhomogeneity[ix, iy],
+                        inhomogeneity[ix2, iy2]
+                    ) > data[ix2, iy2]:
                 return TopplingEvent(ix2, iy2, ix, iy,
                     (data[ix2, iy2] - data[ix, iy])//2)
             return None
@@ -110,7 +133,7 @@ class Pile():
                         self.height[ix, iy] += \
                             stencil(x, y)
 
-    def iterate(self, nsteps=1, inhomogeneity=None):
+    def iterate(self, nsteps=1, **kwargs):
         """
         Apply toppling rules.
 
@@ -118,9 +141,6 @@ class Pile():
         nsteps -- number of iterations
                   (default 1)
         """
-
-        if inhomogeneity is None:
-            inhomogeneity = np.ones((self.nx, self.ny))
 
         for _ in range(nsteps):
             # permute execution order
@@ -130,10 +150,7 @@ class Pile():
             for indexpair in self._indexpairs:
                 event = self._toppling_rule(
                     self.height, *indexpair[0], *indexpair[1],
-                    inhomogeneity=min(
-                        inhomogeneity[indexpair[0]],
-                        inhomogeneity[indexpair[1]]
-                    )
+                    **kwargs
                 )
                 if event is not None:
                     event.execute(self.height, indexpair[2])

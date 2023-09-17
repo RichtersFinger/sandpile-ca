@@ -39,7 +39,7 @@ if USE_MOMENTUM:
     DIFF_TOPPLE = 30
     pile = Pile(
         nx=RESOLUTION[0], ny=RESOLUTION[1],
-        toppling_rule=TopplingRuleSets.BASIC_TOPPLING_RULE(diff_topple=DIFF_TOPPLE)
+        toppling_rule=TopplingRuleSets.INHOMOGENEOUS_TOPPLING_RULE(diff_topple=DIFF_TOPPLE)
     )
 else:
     # wo momentum
@@ -78,7 +78,10 @@ for i in range(SIMULATION_DURATION):
             # save reference
             pre = np.copy(pile.height)
 
-        pile.iterate(1, inhomogeneity=momentum_dummy)
+        if USE_MOMENTUM:
+            pile.iterate(1, inhomogeneity=momentum_dummy)
+        else:
+            pile.iterate(1)
 
         if USE_MOMENTUM or OUTPUT_MOMENTUM:
             # calculate momentum
