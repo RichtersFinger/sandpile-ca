@@ -8,7 +8,7 @@ lattice-space.
   `python3-tk`
 * python packages
 
-  `numpy`, `matplotlib`
+  `numpy`, `scipy`, `matplotlib`
 
 # Run
 Run the simulation with
