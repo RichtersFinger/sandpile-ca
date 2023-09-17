@@ -12,11 +12,11 @@ PILE_VERTICAL_OFFSET = -0.025
 Z_SCALE_FACTOR = 0.8/3
 
 
-bpy.ops.wm.open_mainfile(filepath="render_lq.blend")
+bpy.ops.wm.open_mainfile(filepath="render.blend")
 scn = bpy.context.scene
 
 # read sample data
-data = Path("../data/array_0.dat").read_text(encoding="utf8")
+data = Path("../data_wmomentum/height_0.dat").read_text(encoding="utf8")
 height_array = []
 for line in data.split("\n"):
     if line != "":
@@ -32,6 +32,9 @@ desired_width = PLATE_WIDTH/max(nx, ny) * 0.98 / 2
 reference_cube = bpy.data.objects["Cube_Reference"]
 reference_cube.location = (0, 0, -2*CUBE_REFERENCE_HEIGHT)
 reference_cube.scale = (desired_width, desired_width, 0.1)
+
+# get camera empty-parent (for rotation)
+camera_empty = bpy.data.objects["Empty"]
 
 # prepare array to determine which columns to plot
 visible = []
@@ -60,13 +63,15 @@ print("generated blender objects")
 
 #bpy.ops.wm.save_as_mainfile(filepath="render_.blend")
 
-nframes = 20
+frame0 = 340
+nframes = 3599
 
-frame0 = 20#0
+angle0 = math.radians(-20)
+angle1 = math.radians(200)
 frame1 = nframes
 for i in range(frame0, frame1 + 1, 1):
     # read sample data
-    data = Path(f"../data/array_{i}.dat").read_text(encoding="utf8")
+    data = Path(f"../data_wmomentum/height_{i}.dat").read_text(encoding="utf8")
     height_array = []
     for line in data.split("\n"):
         if line != "":
@@ -83,6 +88,9 @@ for i in range(frame0, frame1 + 1, 1):
                     -CUBE_REFERENCE_HEIGHT + PILE_VERTICAL_OFFSET \
                         + Z_SCALE_FACTOR * desired_width * height_array[ix][iy]
                 )
+
+    # position camera
+    camera_empty.rotation_euler[2] = angle0 + i/nframes * (angle1 - angle0)
 
     # render
     bpy.context.scene.render.filepath = f"res/frame{i}.png"

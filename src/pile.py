@@ -5,7 +5,7 @@ import numpy as np
 
 class TopplingRuleSets():
     @classmethod
-    def BASIC_TOPPLING_RULE(self, diff_topple=1):
+    def BASIC_TOPPLING_RULE(cls, diff_topple=1):
         """Returns function to be used as toppling rule."""
         def rule(data, ix, iy, ix2, iy2, inhomogeneity=1):
             """Compares neighbors and returns toppling event or None."""
